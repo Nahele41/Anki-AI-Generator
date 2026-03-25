@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Upload, Download, Sparkles, Loader2, BookOpen, FileText, Info, X, Moon, Sun, Globe, Copy, Check } from 'lucide-react';
+import { Upload, Download, Sparkles, Loader2, BookOpen, FileText, Info, X, Moon, Sun, Globe, Copy, Check, Trash2 } from 'lucide-react';
 import { analyzeNotes, analyzeCode, Flashcard, AnalysisResult, Example } from './lib/gemini';
 import { extractTextFromPDF } from './lib/pdf';
 import { motion, AnimatePresence } from 'motion/react';
@@ -21,18 +21,21 @@ const translations = {
     generatingProgress: "Generazione parte {current} di {total}...",
     errorEmpty: "Inserisci degli appunti o carica un file prima di generare.",
     errorGen: "Si è verificato un errore durante la generazione delle flashcard. Riprova.",
-    howItWorks: "Come funziona?",
-    step1Title: "Prepara il materiale",
-    step1Desc: "Carica un PDF, un file di testo, oppure incolla i tuoi appunti. Puoi anche usare il box di testo per dare istruzioni specifiche (es. <em>\"Fai carte solo sul capitolo 2\"</em>).",
-    step2Title: "Genera e personalizza",
-    step2Desc: "Clicca su \"Genera Flashcard\". L'IA creerà domande, risposte e curiosità. Scegli il nome del mazzo e scarica il file.",
-    step3Title: "Importa in Anki",
-    step3Desc1: "Apri Anki e vai su File > Importa.",
-    step3Desc2: "Seleziona il file .txt appena scaricato.",
-    step3Desc3: "Imposta il separatore su Tabulazione.",
-    step3Desc4: "Spunta \"Consenti HTML nei campi\" (fondamentale per la formattazione).",
-    step3Desc5: "Clicca su Importa.",
+    howItWorks: "Guida all'uso",
+    step1Title: "1. Scegli la modalità e inserisci il testo",
+    step1Desc: "Usa la modalità <strong>Appunti</strong> per testi discorsivi (storia, biologia, ecc.) o <strong>Coding</strong> per analizzare codice sorgente. Incolla il testo o carica un file (PDF, TXT).",
+    step2Title: "2. Genera lo studio guidato",
+    step2Desc: "L'IA non si limiterà a creare flashcard: ti fornirà prima una <strong>spiegazione chiara</strong> e degli <strong>esempi pratici</strong> per aiutarti a comprendere a fondo l'argomento.",
+    step3Title: "3. Esporta e importa su Anki",
+    step3Desc1: "Scarica il file .txt generato.",
+    step3Desc2: "Apri Anki e vai su File > Importa.",
+    step3Desc3: "Seleziona il file e imposta il separatore su <strong>Tabulazione</strong>.",
+    step3Desc4: "Spunta <strong>Consenti HTML nei campi</strong> (fondamentale per formule matematiche e formattazione).",
+    step3Desc5: "Clicca su Importa e inizia a studiare!",
     exportName: "Nome del file di esportazione",
+    footerBuiltWith: "Sviluppato da Nahele Parisi con React e Gemini AI.",
+    footerDisclaimer: "L'IA può commettere errori. Verifica sempre le informazioni importanti.",
+    footerAnkiLink: "Scarica Anki",
     downloadTxt: "Scarica .txt",
     previewTitle: "Anteprima Flashcard",
     cardsCount: "carte",
@@ -48,7 +51,8 @@ const translations = {
     codingPlaceholder: "Incolla il tuo codice qui...",
     codingTitle: "Analisi del Codice",
     explanation: "Spiegazione",
-    examples: "Esempi di Utilizzo"
+    examples: "Esempi di Utilizzo",
+    clearText: "Cancella testo"
   },
   en: {
     title: "Anki AI Generator",
@@ -61,18 +65,21 @@ const translations = {
     generatingProgress: "Generating part {current} of {total}...",
     errorEmpty: "Please enter some notes or upload a file before generating.",
     errorGen: "An error occurred while generating flashcards. Please try again.",
-    howItWorks: "How it works?",
-    step1Title: "Prepare your material",
-    step1Desc: "Upload a PDF, a text file, or paste your notes. You can also use the text box to give specific instructions (e.g., <em>\"Only make cards for chapter 2\"</em>).",
-    step2Title: "Generate and customize",
-    step2Desc: "Click \"Generate Flashcards\". The AI will create questions, answers, and trivia. Choose the deck name and download the file.",
-    step3Title: "Import into Anki",
-    step3Desc1: "Open Anki and go to File > Import.",
-    step3Desc2: "Select the newly downloaded .txt file.",
-    step3Desc3: "Set the separator to Tab.",
-    step3Desc4: "Check \"Allow HTML in fields\" (crucial for formatting).",
-    step3Desc5: "Click Import.",
+    howItWorks: "How to use",
+    step1Title: "1. Choose mode and input text",
+    step1Desc: "Use <strong>Notes</strong> mode for standard text (history, biology, etc.) or <strong>Coding</strong> to analyze source code. Paste text or upload a file (PDF, TXT).",
+    step2Title: "2. Generate study guide",
+    step2Desc: "The AI won't just create flashcards: it will first provide a <strong>clear explanation</strong> and <strong>practical examples</strong> to help you fully understand the topic.",
+    step3Title: "3. Export and import to Anki",
+    step3Desc1: "Download the generated .txt file.",
+    step3Desc2: "Open Anki and go to File > Import.",
+    step3Desc3: "Select the file and set the separator to <strong>Tab</strong>.",
+    step3Desc4: "Check <strong>Allow HTML in fields</strong> (crucial for math formulas and formatting).",
+    step3Desc5: "Click Import and start studying!",
     exportName: "Export file name",
+    footerBuiltWith: "Built by Nahele Parisi with React and Gemini AI.",
+    footerDisclaimer: "AI can make mistakes. Always verify important information.",
+    footerAnkiLink: "Download Anki",
     downloadTxt: "Download .txt",
     previewTitle: "Flashcard Preview",
     cardsCount: "cards",
@@ -88,7 +95,8 @@ const translations = {
     codingPlaceholder: "Paste your code here...",
     codingTitle: "Code Analysis",
     explanation: "Explanation",
-    examples: "Usage Examples"
+    examples: "Usage Examples",
+    clearText: "Clear text"
   }
 };
 
@@ -100,7 +108,11 @@ export default function App() {
   const [mode, setMode] = useState<'standard' | 'coding'>('standard');
   const t = translations[lang];
 
-  const [notes, setNotes] = useState('');
+  const [standardText, setStandardText] = useState('');
+  const [codingText, setCodingText] = useState('');
+  const currentText = mode === 'standard' ? standardText : codingText;
+  const setCurrentText = (val: string) => mode === 'standard' ? setStandardText(val) : setCodingText(val);
+
   const [isGenerating, setIsGenerating] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0 });
   const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
@@ -173,7 +185,7 @@ export default function App() {
   };
 
   const handleGenerate = async () => {
-    if (!notes.trim() && !documentText?.text.trim()) {
+    if (!currentText.trim() && !documentText?.text.trim()) {
       setError(t.errorEmpty);
       return;
     }
@@ -184,7 +196,7 @@ export default function App() {
     setAnalysis(null);
 
     try {
-      const combinedText = [notes, documentText?.text].filter(Boolean).join('\n\n');
+      const combinedText = [currentText, documentText?.text].filter(Boolean).join('\n\n');
       
       if (mode === 'coding') {
         const result = await analyzeCode(combinedText, t.promptLang);
@@ -248,7 +260,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans selection:bg-blue-200 dark:selection:bg-blue-900 transition-colors duration-200">
+    <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans selection:bg-blue-200 dark:selection:bg-blue-900 transition-colors duration-200">
       {/* Header */}
       <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-10 transition-colors duration-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
@@ -278,7 +290,7 @@ export default function App() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           {/* Left Column: Input */}
           <div className="space-y-6 lg:col-span-5 lg:sticky lg:top-24 lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto custom-scrollbar lg:pr-2 pb-4">
@@ -318,12 +330,23 @@ export default function App() {
                 {t.notesDesc}
               </p>
 
-              <textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder={mode === 'coding' ? t.codingPlaceholder : t.placeholder}
-                className={`w-full h-64 lg:h-96 p-4 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-blue-500 dark:focus:border-blue-500 resize-none transition-all text-sm dark:text-slate-200 ${mode === 'coding' ? 'font-mono' : ''}`}
-              />
+              <div className="relative">
+                <textarea
+                  value={currentText}
+                  onChange={(e) => setCurrentText(e.target.value)}
+                  placeholder={mode === 'coding' ? t.codingPlaceholder : t.placeholder}
+                  className={`w-full h-64 lg:h-96 p-4 pr-12 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-blue-500 dark:focus:border-blue-500 resize-none transition-all text-sm dark:text-slate-200 ${mode === 'coding' ? 'font-mono' : ''}`}
+                />
+                {currentText && (
+                  <button
+                    onClick={() => setCurrentText('')}
+                    className="absolute top-3 right-3 p-1.5 text-slate-400 hover:text-red-500 dark:text-slate-500 dark:hover:text-red-400 bg-white dark:bg-slate-900 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors shadow-sm border border-slate-200 dark:border-slate-800"
+                    title={t.clearText}
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                )}
+              </div>
 
               {documentText && (
                 <div className="mt-3 flex items-center justify-between bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800/50 p-3 rounded-xl">
@@ -358,7 +381,7 @@ export default function App() {
                 </button>
                 <button
                   onClick={handleGenerate}
-                  disabled={isGenerating || (!notes.trim() && !documentText?.text.trim())}
+                  disabled={isGenerating || (!currentText.trim() && !documentText?.text.trim())}
                   className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 dark:disabled:bg-blue-800 text-white px-4 py-2.5 rounded-xl font-medium transition-colors shadow-sm"
                 >
                   {isGenerating ? (
@@ -393,30 +416,27 @@ export default function App() {
               </h3>
               <div className="space-y-5 text-sm text-blue-800 dark:text-blue-200/80">
                 <div>
-                  <h4 className="font-semibold text-blue-900 dark:text-blue-300 mb-1 flex items-center gap-2">
-                    <span className="bg-blue-200 dark:bg-blue-800 text-blue-800 dark:text-blue-200 w-5 h-5 rounded-full flex items-center justify-center text-xs">1</span>
+                  <h4 className="font-semibold text-blue-900 dark:text-blue-300 mb-1">
                     {t.step1Title}
                   </h4>
-                  <p className="ml-7 text-blue-700/90 dark:text-blue-200/70 leading-relaxed" dangerouslySetInnerHTML={{__html: t.step1Desc}}></p>
+                  <p className="text-blue-700/90 dark:text-blue-200/70 leading-relaxed" dangerouslySetInnerHTML={{__html: t.step1Desc}}></p>
                 </div>
                 <div>
-                  <h4 className="font-semibold text-blue-900 dark:text-blue-300 mb-1 flex items-center gap-2">
-                    <span className="bg-blue-200 dark:bg-blue-800 text-blue-800 dark:text-blue-200 w-5 h-5 rounded-full flex items-center justify-center text-xs">2</span>
+                  <h4 className="font-semibold text-blue-900 dark:text-blue-300 mb-1">
                     {t.step2Title}
                   </h4>
-                  <p className="ml-7 text-blue-700/90 dark:text-blue-200/70 leading-relaxed">{t.step2Desc}</p>
+                  <p className="text-blue-700/90 dark:text-blue-200/70 leading-relaxed" dangerouslySetInnerHTML={{__html: t.step2Desc}}></p>
                 </div>
                 <div>
-                  <h4 className="font-semibold text-blue-900 dark:text-blue-300 mb-2 flex items-center gap-2">
-                    <span className="bg-blue-200 dark:bg-blue-800 text-blue-800 dark:text-blue-200 w-5 h-5 rounded-full flex items-center justify-center text-xs">3</span>
+                  <h4 className="font-semibold text-blue-900 dark:text-blue-300 mb-2">
                     {t.step3Title}
                   </h4>
-                  <ul className="list-disc list-outside ml-10 space-y-1.5 text-blue-700/90 dark:text-blue-200/70">
-                    <li>{t.step3Desc1}</li>
-                    <li>{t.step3Desc2}</li>
-                    <li>{t.step3Desc3}</li>
-                    <li>{t.step3Desc4}</li>
-                    <li>{t.step3Desc5}</li>
+                  <ul className="list-disc list-outside ml-5 space-y-1.5 text-blue-700/90 dark:text-blue-200/70">
+                    <li dangerouslySetInnerHTML={{__html: t.step3Desc1}}></li>
+                    <li dangerouslySetInnerHTML={{__html: t.step3Desc2}}></li>
+                    <li dangerouslySetInnerHTML={{__html: t.step3Desc3}}></li>
+                    <li dangerouslySetInnerHTML={{__html: t.step3Desc4}}></li>
+                    <li dangerouslySetInnerHTML={{__html: t.step3Desc5}}></li>
                   </ul>
                 </div>
               </div>
@@ -576,6 +596,41 @@ export default function App() {
           </div>
         </div>
       </main>
+
+      {/* Footer */}
+      <footer className="bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 py-8 mt-auto transition-colors duration-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
+            <Sparkles size={18} className="text-blue-500" />
+            <span className="text-sm font-medium">{t.footerBuiltWith}</span>
+          </div>
+          
+          <div className="text-center md:text-right">
+            <p className="text-xs text-slate-400 dark:text-slate-500 max-w-md">
+              {t.footerDisclaimer}
+            </p>
+            <div className="mt-2 flex items-center justify-center md:justify-end gap-4 text-sm">
+              <a 
+                href="https://apps.ankiweb.net/" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-blue-600 dark:text-blue-400 hover:underline font-medium"
+              >
+                {t.footerAnkiLink}
+              </a>
+              <span className="text-slate-300 dark:text-slate-700">•</span>
+              <a 
+                href="https://github.com/Nahele41/Anki-AI-Generator" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors"
+              >
+                GitHub
+              </a>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
