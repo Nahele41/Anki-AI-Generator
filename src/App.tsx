@@ -1,10 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Upload, Download, Sparkles, Loader2, BookOpen, FileText, Info, X, Moon, Sun, Globe } from 'lucide-react';
-import { generateFlashcards, analyzeCode, Flashcard, CodeAnalysisResult } from './lib/gemini';
+import { Upload, Download, Sparkles, Loader2, BookOpen, FileText, Info, X, Moon, Sun, Globe, Copy, Check } from 'lucide-react';
+import { analyzeNotes, analyzeCode, Flashcard, AnalysisResult, Example } from './lib/gemini';
 import { extractTextFromPDF } from './lib/pdf';
 import { motion, AnimatePresence } from 'motion/react';
-import { Code2, PenLine, Terminal } from 'lucide-react';
+import { Code2, PenLine, Terminal, Lightbulb } from 'lucide-react';
 import Markdown from 'react-markdown';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
 
 const translations = {
   it: {
@@ -101,10 +104,19 @@ export default function App() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0 });
   const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
-  const [codeAnalysis, setCodeAnalysis] = useState<CodeAnalysisResult | null>(null);
+  const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState('');
   const [documentText, setDocumentText] = useState<{ text: string; name: string } | null>(null);
   const [deckName, setDeckName] = useState(t.defaultDeckName);
+  const [copiedExplanation, setCopiedExplanation] = useState(false);
+
+  const handleCopyExplanation = () => {
+    if (analysis) {
+      navigator.clipboard.writeText(analysis.explanation);
+      setCopiedExplanation(true);
+      setTimeout(() => setCopiedExplanation(false), 2000);
+    }
+  };
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -169,23 +181,37 @@ export default function App() {
     setError('');
     setIsGenerating(true);
     setFlashcards([]);
-    setCodeAnalysis(null);
+    setAnalysis(null);
 
     try {
       const combinedText = [notes, documentText?.text].filter(Boolean).join('\n\n');
       
       if (mode === 'coding') {
         const result = await analyzeCode(combinedText, t.promptLang);
-        setCodeAnalysis(result);
+        setAnalysis(result);
         setFlashcards(result.flashcards);
       } else {
         const chunks = chunkText(combinedText);
         setProgress({ current: 0, total: chunks.length });
 
+        let combinedExplanation = '';
+        let combinedExamples: Example[] = [];
+        let combinedFlashcards: Flashcard[] = [];
+
         for (let i = 0; i < chunks.length; i++) {
           setProgress({ current: i + 1, total: chunks.length });
-          const cards = await generateFlashcards(chunks[i], t.promptLang);
-          setFlashcards(prev => [...prev, ...cards]);
+          const result = await analyzeNotes(chunks[i], t.promptLang);
+          
+          combinedExplanation += (i > 0 ? '\n\n---\n\n' : '') + result.explanation;
+          combinedExamples = [...combinedExamples, ...result.examples];
+          combinedFlashcards = [...combinedFlashcards, ...result.flashcards];
+          
+          setAnalysis({
+            explanation: combinedExplanation,
+            examples: combinedExamples,
+            flashcards: combinedFlashcards
+          });
+          setFlashcards(combinedFlashcards);
         }
       }
     } catch (err) {
@@ -253,9 +279,9 @@ export default function App() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           {/* Left Column: Input */}
-          <div className="space-y-6">
+          <div className="space-y-6 lg:col-span-5 lg:sticky lg:top-24 lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto custom-scrollbar lg:pr-2 pb-4">
             <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 transition-colors duration-200">
               
               {/* Mode Toggle */}
@@ -296,7 +322,7 @@ export default function App() {
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder={mode === 'coding' ? t.codingPlaceholder : t.placeholder}
-                className={`w-full h-64 p-4 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-blue-500 dark:focus:border-blue-500 resize-none transition-all text-sm dark:text-slate-200 ${mode === 'coding' ? 'font-mono' : ''}`}
+                className={`w-full h-64 lg:h-96 p-4 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-blue-500 dark:focus:border-blue-500 resize-none transition-all text-sm dark:text-slate-200 ${mode === 'coding' ? 'font-mono' : ''}`}
               />
 
               {documentText && (
@@ -398,7 +424,7 @@ export default function App() {
           </div>
 
           {/* Right Column: Preview */}
-          <div className="space-y-4">
+          <div className="space-y-4 lg:col-span-7">
             {flashcards.length > 0 && (
               <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col sm:flex-row sm:items-end gap-4 justify-between transition-colors duration-200">
                 <div className="flex-1 w-full">
@@ -436,16 +462,16 @@ export default function App() {
               )}
             </div>
 
-            {flashcards.length === 0 && !codeAnalysis ? (
+            {flashcards.length === 0 && !analysis ? (
               <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 border-dashed rounded-2xl h-64 flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 p-6 text-center transition-colors duration-200">
                 <BookOpen size={48} className="mb-4 opacity-20" />
                 <p className="font-medium text-slate-500 dark:text-slate-400">{t.noCardsTitle}</p>
                 <p className="text-sm mt-1">{t.noCardsDesc}</p>
               </div>
             ) : (
-              <div className="space-y-6 max-h-[calc(100vh-12rem)] overflow-y-auto pr-2 pb-8 custom-scrollbar">
+              <div className="space-y-6 pb-8">
                 
-                {mode === 'coding' && codeAnalysis && (
+                {analysis && (
                   <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -453,31 +479,60 @@ export default function App() {
                   >
                     {/* Explanation */}
                     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
-                      <div className="p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 flex items-center gap-2">
-                        <Info size={18} className="text-blue-600 dark:text-blue-400" />
-                        <h3 className="font-semibold text-slate-800 dark:text-slate-100">{t.explanation}</h3>
+                      <div className="p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Info size={18} className="text-blue-600 dark:text-blue-400" />
+                          <h3 className="font-semibold text-slate-800 dark:text-slate-100">{t.explanation}</h3>
+                        </div>
+                        <button
+                          onClick={handleCopyExplanation}
+                          className="p-1.5 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+                          title="Copia spiegazione"
+                        >
+                          {copiedExplanation ? <Check size={16} className="text-emerald-500" /> : <Copy size={16} />}
+                        </button>
                       </div>
                       <div className="p-5">
                         <div className="markdown-body">
-                          <Markdown>{codeAnalysis.explanation}</Markdown>
+                          <Markdown
+                            remarkPlugins={[remarkMath]}
+                            rehypePlugins={[rehypeKatex]}
+                          >
+                            {analysis.explanation}
+                          </Markdown>
                         </div>
                       </div>
                     </div>
 
                     {/* Examples */}
-                    {codeAnalysis.examples.length > 0 && (
+                    {analysis.examples.length > 0 && (
                       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
                         <div className="p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 flex items-center gap-2">
-                          <Terminal size={18} className="text-emerald-600 dark:text-emerald-400" />
+                          {mode === 'coding' ? (
+                            <Terminal size={18} className="text-emerald-600 dark:text-emerald-400" />
+                          ) : (
+                            <Lightbulb size={18} className="text-emerald-600 dark:text-emerald-400" />
+                          )}
                           <h3 className="font-semibold text-slate-800 dark:text-slate-100">{t.examples}</h3>
                         </div>
                         <div className="p-5 space-y-6">
-                          {codeAnalysis.examples.map((ex, idx) => (
+                          {analysis.examples.map((ex, idx) => (
                             <div key={idx} className="space-y-2">
                               <p className="text-sm font-medium text-slate-700 dark:text-slate-300">{ex.description}</p>
-                              <pre className="bg-slate-900 dark:bg-black text-slate-50 p-4 rounded-xl overflow-x-auto text-sm font-mono leading-relaxed border border-slate-800">
-                                <code>{ex.code}</code>
-                              </pre>
+                              {mode === 'coding' ? (
+                                <pre className="bg-slate-900 dark:bg-black text-slate-50 p-4 rounded-xl overflow-x-auto text-sm font-mono leading-relaxed border border-slate-800">
+                                  <code>{ex.content}</code>
+                                </pre>
+                              ) : (
+                                <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl text-sm text-slate-700 dark:text-slate-300 border border-slate-100 dark:border-slate-800">
+                                  <Markdown
+                                    remarkPlugins={[remarkMath]}
+                                    rehypePlugins={[rehypeKatex]}
+                                  >
+                                    {ex.content}
+                                  </Markdown>
+                                </div>
+                              )}
                             </div>
                           ))}
                         </div>

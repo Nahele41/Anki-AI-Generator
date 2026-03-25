@@ -8,24 +8,30 @@ export interface Flashcard {
   trivia: string;
 }
 
-export interface CodeExample {
+export interface Example {
   description: string;
-  code: string;
+  content: string;
 }
 
-export interface CodeAnalysisResult {
+export interface AnalysisResult {
   explanation: string;
-  examples: CodeExample[];
+  examples: Example[];
   flashcards: Flashcard[];
 }
 
-export async function generateFlashcards(textChunk: string, language: string = 'italiano'): Promise<Flashcard[]> {
-  const prompt = `Analizza il seguente testo e crea un mazzo di flashcard per Anki in lingua ${language}.
-Le flashcard devono essere completamente esaustive e approfondite.
-Per ogni concetto chiave, crea una domanda chiara e una risposta dettagliata.
-Inoltre, aggiungi una curiosità significativa o un fatto interessante legato all'argomento per facilitare la memorizzazione.
+export async function analyzeNotes(textChunk: string, language: string = 'italiano'): Promise<AnalysisResult> {
+  const prompt = `Analizza il seguente testo (appunti o documento) e fornisci un'analisi dettagliata in lingua ${language}.
 
-Testo:
+REGOLE FONDAMENTALI:
+1. La spiegazione deve essere formattata in Markdown valido. Usa DOPPI A CAPO (\\n\\n) per separare i paragrafi, usa intestazioni (##), elenchi puntati e grassetti per rendere il testo leggibile.
+2. Estrai i concetti chiave e spiegali in modo chiaro, come se fossi un tutor esperto.
+
+Devi restituire un oggetto JSON con tre proprietà:
+1. "explanation": Un riassunto strutturato e discorsivo in Markdown che spieghi i concetti chiave del testo.
+2. "examples": Un array di esempi pratici, analogie o casi d'uso legati ai concetti spiegati. Ogni esempio deve avere una "description" e un "content" (il dettaglio dell'esempio o l'analogia).
+3. "flashcards": Un array di ALMENO 5 o 6 flashcard per Anki per memorizzare i concetti chiave. Ogni flashcard deve avere "front" (domanda), "back" (risposta dettagliata) e "trivia" (curiosità).
+
+Testo da analizzare:
 ${textChunk}`;
 
   const response = await ai.models.generateContent({
@@ -34,16 +40,34 @@ ${textChunk}`;
     config: {
       responseMimeType: "application/json",
       responseSchema: {
-        type: Type.ARRAY,
-        items: {
-          type: Type.OBJECT,
-          properties: {
-            front: { type: Type.STRING, description: "La domanda della flashcard (Fronte)" },
-            back: { type: Type.STRING, description: "La risposta dettagliata (Retro)" },
-            trivia: { type: Type.STRING, description: "Una curiosità o fatto interessante sull'argomento" }
+        type: Type.OBJECT,
+        properties: {
+          explanation: { type: Type.STRING, description: "Riassunto chiaro e strutturato in Markdown" },
+          examples: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                description: { type: Type.STRING, description: "Descrizione dell'esempio o analogia" },
+                content: { type: Type.STRING, description: "Dettaglio dell'esempio" }
+              },
+              required: ["description", "content"]
+            }
           },
-          required: ["front", "back", "trivia"]
-        }
+          flashcards: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                front: { type: Type.STRING, description: "La domanda della flashcard (Fronte)" },
+                back: { type: Type.STRING, description: "La risposta dettagliata (Retro)" },
+                trivia: { type: Type.STRING, description: "Una curiosità o fatto interessante" }
+              },
+              required: ["front", "back", "trivia"]
+            }
+          }
+        },
+        required: ["explanation", "examples", "flashcards"]
       }
     }
   });
@@ -55,7 +79,7 @@ ${textChunk}`;
   return JSON.parse(response.text);
 }
 
-export async function analyzeCode(codeText: string, language: string = 'italiano'): Promise<CodeAnalysisResult> {
+export async function analyzeCode(codeText: string, language: string = 'italiano'): Promise<AnalysisResult> {
   const prompt = `Agisci come un professore universitario che spiega un frammento di codice a uno studente di laurea magistrale in Ingegneria Informatica.
 Fornisci un'analisi accademica, tecnica e approfondita in lingua ${language}.
 
@@ -68,7 +92,7 @@ Devi restituire un oggetto JSON con tre proprietà:
    - Concetti fondamentali introdotti dal codice (algoritmi, strutture dati, complessità, paradigmi). Includi background se necessario.
    - Strumenti utilizzati (librerie, framework, API di sistema, peculiarità del linguaggio).
    - Pattern da ricordare per implementare altre funzionalità (design pattern, best practice architetturali, idiomi).
-2. "examples": Un array di esempi pratici di esecuzione o utilizzo del codice (questo copre il punto "esempi di funzionamento"). Ogni esempio deve avere una "description" e il "code" (il codice dell'esempio o l'output).
+2. "examples": Un array di esempi pratici di esecuzione o utilizzo del codice (questo copre il punto "esempi di funzionamento"). Ogni esempio deve avere una "description" e il "content" (il codice dell'esempio o l'output).
 3. "flashcards": Un array di ALMENO 5 o 6 flashcard per Anki basate STRETTAMENTE sulla spiegazione appena fornita. Le flashcard devono testare la comprensione dei concetti avanzati, dei pattern e degli strumenti discussi. Ogni flashcard deve avere "front" (domanda), "back" (risposta dettagliata) e "trivia" (curiosità tecnica o storica).
 
 Codice da analizzare:
@@ -89,9 +113,9 @@ ${codeText}`;
               type: Type.OBJECT,
               properties: {
                 description: { type: Type.STRING, description: "Descrizione dell'esempio" },
-                code: { type: Type.STRING, description: "Codice dell'esempio o output" }
+                content: { type: Type.STRING, description: "Codice dell'esempio o output" }
               },
-              required: ["description", "code"]
+              required: ["description", "content"]
             }
           },
           flashcards: {
