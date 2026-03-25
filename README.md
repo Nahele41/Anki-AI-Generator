@@ -1,26 +1,28 @@
-# 🧠 Anki AI Flashcard Generator
+# Anki AI Generator 🧠✨
 
-An intelligent web application that automatically generates comprehensive Anki flashcards from your study notes and PDF documents using the power of Google's Gemini AI.
+Anki AI Generator is a powerful web application built with React and Google's Gemini AI that automatically transforms your study notes, PDFs, or source code into high-quality Anki flashcards. 
 
-## ✨ Features
+## 🌟 Features
 
-- **📄 PDF & Text Support:** Upload PDF documents or paste your notes directly.
-- **🧩 Smart Chunking:** Processes large documents (20-40 pages) by automatically chunking text to maintain high-quality generation without hitting token limits.
-- **🌍 Bilingual (IT/EN):** Interface and AI generation available in both Italian and English.
-- **🌗 Dark Mode:** Eye-friendly dark theme for late-night study sessions.
-- **💡 Trivia Generation:** Automatically adds interesting facts/trivia to the back of each card to aid memory retention.
-- **📥 Direct Anki Export:** Downloads a ready-to-import `.txt` file formatted perfectly for Anki.
+- **Two Specialized Modes**:
+  - 📝 **Notes Mode**: Perfect for standard text, history, biology, literature, etc.
+  - 💻 **Coding Mode**: Tailored for analyzing source code, providing explanations, and usage examples.
+- **Multiple Input Methods**: Paste your text directly or upload files (`.txt`, `.md`, `.csv`, `.pdf`).
+- **Smart AI Generation**: Doesn't just generate flashcards! It provides a clear explanation of the topic, practical examples, and creates flashcards with Front (Question), Back (Answer), and Trivia.
+- **Anki-Ready Export**: Downloads a `.txt` file perfectly formatted for Anki (Tab-separated with HTML support for math formulas and code highlighting).
+- **Bilingual UI**: Supports both Italian and English.
+- **Dark/Light Mode**: Beautiful UI that respects your system preferences.
+- **Math & Code Support**: Renders LaTeX math formulas and Markdown code blocks seamlessly.
 
-## 🛠️ Tech Stack
+## 🚀 Tech Stack
 
-- **Frontend:** React 19, TypeScript, Vite
-- **Styling:** Tailwind CSS
-- **AI Integration:** Google Gemini API (`@google/genai` using `gemini-3.1-pro-preview`)
-- **PDF Parsing:** PDF.js (`pdfjs-dist`)
-- **Animations:** Motion (`motion/react`)
-- **Icons:** Lucide React
+- **Frontend**: React 18, Vite, Tailwind CSS
+- **AI Integration**: Google Gemini API (`@google/genai`)
+- **Icons**: Lucide React
+- **Markdown & Math**: `react-markdown`, `remark-math`, `rehype-katex`
+- **PDF Parsing**: `pdfjs-dist`
 
-## 🚀 Getting Started
+## 🛠️ Getting Started
 
 ### Prerequisites
 
@@ -29,31 +31,42 @@ An intelligent web application that automatically generates comprehensive Anki f
 
 ### Installation
 
-1. Clone the repository or download the source code.
-2. Install the dependencies:
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/Nahele41/Anki-AI-Generator.git
+   cd Anki-AI-Generator
+   ```
+
+2. Install dependencies:
    ```bash
    npm install
    ```
-3. Create a `.env` file in the root directory and add your Gemini API key:
+
+3. Set up your environment variables:
+   Create a `.env` file in the root directory and add your Gemini API key:
    ```env
-   GEMINI_API_KEY=your_api_key_here
+   VITE_GEMINI_API_KEY=your_api_key_here
    ```
+
 4. Start the development server:
    ```bash
    npm run dev
    ```
-5. Open your browser and navigate to `http://localhost:3000`.
 
-## 📖 How to Import to Anki
+## 📚 How to Import into Anki
 
-1. Generate your flashcards in the app and click **Download .txt**.
-2. Open the Anki desktop application.
-3. Go to **File > Import**.
-4. Select the downloaded `.txt` file.
-5. Ensure the separator is set to **Tab**.
-6. **Crucial:** Check the box that says **"Allow HTML in fields"** (this ensures the formatting and trivia sections render correctly).
-7. Click **Import**.
+1. Generate and download your `.txt` file from the app.
+2. Open **Anki** and go to `File` > `Import`.
+3. Select the downloaded `.txt` file.
+4. **Crucial Settings**:
+   - Set the separator to **Tab**.
+   - Check the box for **"Allow HTML in fields"** (This is required for code blocks and math formulas to render correctly).
+5. Click **Import** and start studying!
 
-## 📝 License
+## 🤝 Contributing
+
+Contributions, issues, and feature requests are welcome! Feel free to check the [issues page](https://github.com/Nahele41/Anki-AI-Generator/issues).
+
+## 📄 License
 
 This project is open-source and available under the MIT License.
