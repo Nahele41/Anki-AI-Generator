@@ -1,8 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Upload, Download, Sparkles, Loader2, BookOpen, FileText, Info, X, Moon, Sun, Globe } from 'lucide-react';
-import { generateFlashcards, Flashcard } from './lib/gemini';
+import { generateFlashcards, analyzeCode, Flashcard, CodeAnalysisResult } from './lib/gemini';
 import { extractTextFromPDF } from './lib/pdf';
 import { motion, AnimatePresence } from 'motion/react';
+import { Code2, PenLine, Terminal } from 'lucide-react';
+import Markdown from 'react-markdown';
 
 const translations = {
   it: {
@@ -37,7 +39,13 @@ const translations = {
     back: "Retro (Risposta)",
     trivia: "Curiosità",
     promptLang: "italiano",
-    defaultDeckName: "Mazzo_Anki"
+    defaultDeckName: "Mazzo_Anki",
+    modeStandard: "Appunti",
+    modeCoding: "Coding",
+    codingPlaceholder: "Incolla il tuo codice qui...",
+    codingTitle: "Analisi del Codice",
+    explanation: "Spiegazione",
+    examples: "Esempi di Utilizzo"
   },
   en: {
     title: "Anki AI Generator",
@@ -71,7 +79,13 @@ const translations = {
     back: "Back (Answer)",
     trivia: "Trivia",
     promptLang: "english",
-    defaultDeckName: "Anki_Deck"
+    defaultDeckName: "Anki_Deck",
+    modeStandard: "Notes",
+    modeCoding: "Coding",
+    codingPlaceholder: "Paste your code here...",
+    codingTitle: "Code Analysis",
+    explanation: "Explanation",
+    examples: "Usage Examples"
   }
 };
 
@@ -80,12 +94,14 @@ type Language = 'it' | 'en';
 export default function App() {
   const [lang, setLang] = useState<Language>('it');
   const [isDark, setIsDark] = useState(false);
+  const [mode, setMode] = useState<'standard' | 'coding'>('standard');
   const t = translations[lang];
 
   const [notes, setNotes] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0 });
   const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
+  const [codeAnalysis, setCodeAnalysis] = useState<CodeAnalysisResult | null>(null);
   const [error, setError] = useState('');
   const [documentText, setDocumentText] = useState<{ text: string; name: string } | null>(null);
   const [deckName, setDeckName] = useState(t.defaultDeckName);
@@ -152,18 +168,25 @@ export default function App() {
 
     setError('');
     setIsGenerating(true);
-    setFlashcards([]); // Reset flashcards before generating new ones
+    setFlashcards([]);
+    setCodeAnalysis(null);
 
     try {
       const combinedText = [notes, documentText?.text].filter(Boolean).join('\n\n');
-      const chunks = chunkText(combinedText);
       
-      setProgress({ current: 0, total: chunks.length });
+      if (mode === 'coding') {
+        const result = await analyzeCode(combinedText, t.promptLang);
+        setCodeAnalysis(result);
+        setFlashcards(result.flashcards);
+      } else {
+        const chunks = chunkText(combinedText);
+        setProgress({ current: 0, total: chunks.length });
 
-      for (let i = 0; i < chunks.length; i++) {
-        setProgress({ current: i + 1, total: chunks.length });
-        const cards = await generateFlashcards(chunks[i], t.promptLang);
-        setFlashcards(prev => [...prev, ...cards]);
+        for (let i = 0; i < chunks.length; i++) {
+          setProgress({ current: i + 1, total: chunks.length });
+          const cards = await generateFlashcards(chunks[i], t.promptLang);
+          setFlashcards(prev => [...prev, ...cards]);
+        }
       }
     } catch (err) {
       console.error(err);
@@ -234,9 +257,36 @@ export default function App() {
           {/* Left Column: Input */}
           <div className="space-y-6">
             <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 transition-colors duration-200">
+              
+              {/* Mode Toggle */}
+              <div className="flex p-1 bg-slate-100 dark:bg-slate-800/50 rounded-xl mb-6">
+                <button
+                  onClick={() => setMode('standard')}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-all ${
+                    mode === 'standard' 
+                      ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm' 
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                  }`}
+                >
+                  <PenLine size={16} />
+                  {t.modeStandard}
+                </button>
+                <button
+                  onClick={() => setMode('coding')}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-all ${
+                    mode === 'coding' 
+                      ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm' 
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                  }`}
+                >
+                  <Code2 size={16} />
+                  {t.modeCoding}
+                </button>
+              </div>
+
               <h2 className="text-lg font-semibold mb-2 flex items-center gap-2 text-slate-800 dark:text-slate-100">
-                <FileText size={20} className="text-blue-600 dark:text-blue-400" />
-                {t.notesTitle}
+                {mode === 'coding' ? <Code2 size={20} className="text-blue-600 dark:text-blue-400" /> : <FileText size={20} className="text-blue-600 dark:text-blue-400" />}
+                {mode === 'coding' ? t.codingTitle : t.notesTitle}
               </h2>
               <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
                 {t.notesDesc}
@@ -245,8 +295,8 @@ export default function App() {
               <textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                placeholder={t.placeholder}
-                className="w-full h-64 p-4 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-blue-500 dark:focus:border-blue-500 resize-none transition-all text-sm dark:text-slate-200"
+                placeholder={mode === 'coding' ? t.codingPlaceholder : t.placeholder}
+                className={`w-full h-64 p-4 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-blue-500 dark:focus:border-blue-500 resize-none transition-all text-sm dark:text-slate-200 ${mode === 'coding' ? 'font-mono' : ''}`}
               />
 
               {documentText && (
@@ -386,16 +436,59 @@ export default function App() {
               )}
             </div>
 
-            {flashcards.length === 0 ? (
+            {flashcards.length === 0 && !codeAnalysis ? (
               <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 border-dashed rounded-2xl h-64 flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 p-6 text-center transition-colors duration-200">
                 <BookOpen size={48} className="mb-4 opacity-20" />
                 <p className="font-medium text-slate-500 dark:text-slate-400">{t.noCardsTitle}</p>
                 <p className="text-sm mt-1">{t.noCardsDesc}</p>
               </div>
             ) : (
-              <div className="space-y-4 max-h-[calc(100vh-12rem)] overflow-y-auto pr-2 pb-8 custom-scrollbar">
-                <AnimatePresence>
-                  {flashcards.map((card, index) => (
+              <div className="space-y-6 max-h-[calc(100vh-12rem)] overflow-y-auto pr-2 pb-8 custom-scrollbar">
+                
+                {mode === 'coding' && codeAnalysis && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="space-y-6"
+                  >
+                    {/* Explanation */}
+                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+                      <div className="p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 flex items-center gap-2">
+                        <Info size={18} className="text-blue-600 dark:text-blue-400" />
+                        <h3 className="font-semibold text-slate-800 dark:text-slate-100">{t.explanation}</h3>
+                      </div>
+                      <div className="p-5">
+                        <div className="markdown-body">
+                          <Markdown>{codeAnalysis.explanation}</Markdown>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Examples */}
+                    {codeAnalysis.examples.length > 0 && (
+                      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+                        <div className="p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 flex items-center gap-2">
+                          <Terminal size={18} className="text-emerald-600 dark:text-emerald-400" />
+                          <h3 className="font-semibold text-slate-800 dark:text-slate-100">{t.examples}</h3>
+                        </div>
+                        <div className="p-5 space-y-6">
+                          {codeAnalysis.examples.map((ex, idx) => (
+                            <div key={idx} className="space-y-2">
+                              <p className="text-sm font-medium text-slate-700 dark:text-slate-300">{ex.description}</p>
+                              <pre className="bg-slate-900 dark:bg-black text-slate-50 p-4 rounded-xl overflow-x-auto text-sm font-mono leading-relaxed border border-slate-800">
+                                <code>{ex.code}</code>
+                              </pre>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </motion.div>
+                )}
+
+                <div className="space-y-4">
+                  <AnimatePresence>
+                    {flashcards.map((card, index) => (
                     <motion.div
                       key={index}
                       initial={{ opacity: 0, y: 20 }}
@@ -421,7 +514,8 @@ export default function App() {
                       </div>
                     </motion.div>
                   ))}
-                </AnimatePresence>
+                  </AnimatePresence>
+                </div>
               </div>
             )}
           </div>
